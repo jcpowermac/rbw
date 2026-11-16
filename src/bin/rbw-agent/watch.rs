@@ -25,8 +25,19 @@ fn clock(id: libc::clockid_t) -> std::time::Duration {
     )
 }
 
+// Darwin has no boot-time clock, but there the operands are the other way
+// around: CLOCK_MONOTONIC keeps counting while the system sleeps and
+// CLOCK_UPTIME_RAW does not, so the same difference measures suspended time.
+// Should both keep counting (Apple silicon), it stays zero and lock_on_sleep
+// simply doesn't fire.
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn suspended_time() -> std::time::Duration {
     clock(libc::CLOCK_BOOTTIME).saturating_sub(clock(libc::CLOCK_MONOTONIC))
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn suspended_time() -> std::time::Duration {
+    clock(libc::CLOCK_MONOTONIC).saturating_sub(clock(libc::CLOCK_UPTIME_RAW))
 }
 
 async fn session_idle() -> Option<bool> {
